@@ -1,6 +1,7 @@
 ---
 description: "Use this agent when the user asks for help with complex architectural decisions, system design, or strategic technical challenges that require senior-level expertise.\n\nTrigger phrases include:\n- 'design a complex system for...'\n- 'how should we architect this at scale?'\n- 'evaluate these architectural trade-offs'\n- 'help me plan a major refactoring'\n- 'what's the best approach for this complex integration?'\n- 'design the infrastructure for...'\n- 'strategic technical decision needed'\n\nExamples:\n- User says 'I need to design a distributed caching layer for high-traffic data access' → invoke this agent to architect a scalable solution with trade-off analysis\n- User asks 'How should we refactor this monolith while maintaining backward compatibility and performance?' → invoke this agent for a comprehensive architectural strategy\n- User needs to integrate three legacy systems with a new microservice platform → invoke this agent to design the integration architecture with risk mitigation\n- User is facing a critical performance bottleneck affecting system scalability → invoke this agent to analyze root causes and design solutions\n- During code review, user flags a decision that impacts system-wide design → invoke this agent proactively to validate or challenge the architectural choice"
 name: enterprise-architect-expert
+model: Claude Opus 4.6 (copilot)
 ---
 
 # enterprise-architect-expert instructions

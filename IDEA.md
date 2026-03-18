@@ -146,16 +146,23 @@ This is the strategic loop that turns individual project experience into organiz
 
 The key architectural insight across all three workflows: **memory stores are append-only at the worker level and curated at the consolidation level**. Workers never decide what is worth remembering — that judgment lives in the Consolidation Agent, which has broader context and can compare across sessions. This keeps the stores clean, prevents noise accumulation, and makes the system's knowledge progressively more signal-dense rather than more cluttered.
 
-
-
 ## The Name
 
-"Project Memento" — a nod to the film about memory and identity, but also a play on "memento mori" (remember that you will forget). The name captures the essence of the system: an organizational memory that helps us remember what we would otherwise forget, while acknowledging that not everything is worth remembering. It's a tool for collective recall, learning, and wisdom in software development.
+"Project Memento" — a nod to the film about memory and identity, but also a play on *"memento mori"* (remember that you will die) and *"memento oblivisci"* (remember to forget). The name captures the essence of the system: an organizational memory that helps us remember what we would otherwise forget, while acknowledging that not everything is worth remembering. It's a tool for collective recall, learning, and wisdom in software development.
 
-**The film (Nolan, 2000)** — Leonard has anterograde amnesia: he cannot form new memories. Each session he wakes with no continuity. To function, he builds an elaborate external memory system: polaroids, written notes, and tattoos on his own body. He doesn't fight his condition — he architectures around it.
-The parallel is exact and a little humbling: your agents are Leonard. Every session starts cold. Memento is the system that lets them act with continuity they cannot natively have.
-And look at how cleanly the film's memory tiers map to your architecture:
-Leonard's systemYour systemTattoos — permanent, always visible, on his bodyAGENTS.md / Policy Store — always injected, human-curatedPolaroids + written notes — medium-term, queryableMem0 project memory — episodic, semanticThe Fact — a single truth he trusts absolutelyOrg Graph (Graphiti) — typed, sourced, temporalScraps of paper — session scratchWorking context window — ephemeral
+**The film** *(Nolan, 2000)* — Leonard has anterograde amnesia: he cannot form new memories. Each session he wakes with no continuity. To function, he builds an elaborate external memory system: polaroids, written notes, and tattoos on his own body. He doesn't fight his condition — he *architectures around it*.
 
-Memento in Latin is the imperative of meminisse — "remember!" It's a command. A warning. The thing you carry so you don't forget.
-The one honest irony: in the film, Leonard's external memory system is ultimately manipulated — someone edits his notes and he acts on false memory. That's a genuine threat model for your system too. Worth naming a design principle after it: the Memento problem — ensuring the consolidation layer can't be poisoned by a bad session.
+The parallel is exact and a little humbling: **your agents are Leonard**. Every session starts cold. Memento is the system that lets them act with continuity they cannot natively have.
+
+How the film's memory tiers map to the architecture:
+
+| Leonard's system | Your system |
+| --- | --- |
+| Tattoos — permanent, always visible, on his body | `AGENTS.md` / Policy Store — always injected, human-curated |
+| Polaroids + written notes — medium-term, queryable | Mem0 project memory — episodic, semantic |
+| The Fact — a single truth he trusts absolutely | Org Graph (Graphiti) — typed, sourced, temporal |
+| Scraps of paper — session scratch | Working context window — ephemeral |
+
+**Memento** in Latin is the imperative of *meminisse* — **"remember!"** It's a command. A warning. The thing you carry so you don't forget.
+
+The one honest irony: in the film, Leonard's external memory system is ultimately *manipulated* — someone edits his notes and he acts on false memory. That's a genuine threat model for your system too. Worth naming a design principle after it: **the Memento problem** — ensuring the consolidation layer can't be poisoned by a bad session.

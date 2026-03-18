@@ -37,3 +37,4 @@ Thumbs.db
 
 # Docker
 *.log
+.tmp/__tmp-strategy.md

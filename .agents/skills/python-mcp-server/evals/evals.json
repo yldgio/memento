@@ -1,0 +1,38 @@
+{
+  "skill_name": "python-mcp-server",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build a small Python MCP server that exposes a weather lookup tool and runs over stdio. Use FastMCP, strong type hints, and a structured response model.",
+      "expected_output": "A FastMCP stdio server with a typed tool and structured Pydantic output.",
+      "files": [],
+      "expectations": [
+        "Uses FastMCP from mcp.server.fastmcp",
+        "Uses mcp.run() or mcp.run(transport=\"stdio\")",
+        "Returns a structured model instead of an untyped dict"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Convert an existing Python service into a streamable HTTP MCP server with a shared database connection available through lifespan context.",
+      "expected_output": "A streamable HTTP server design that uses lifespan context rather than global mutable state.",
+      "files": [],
+      "expectations": [
+        "Chooses streamable-http transport",
+        "Uses an async lifespan context manager",
+        "Accesses shared dependencies through ctx.request_context.lifespan_context"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Add a prompt and an async processing tool to a Python MCP server. The tool should log progress through Context and report progress updates while it runs.",
+      "expected_output": "A Python MCP implementation that uses Context for logging and progress reporting and includes prompt registration guidance.",
+      "files": [],
+      "expectations": [
+        "Uses Context in the tool signature",
+        "Calls ctx.info or another Context logger",
+        "Calls ctx.report_progress"
+      ]
+    }
+  ]
+}

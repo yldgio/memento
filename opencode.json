@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".github/instructions/**/*.instructions.md"
+  ],
+  "agent": {
+    "dev-task-executor": {
+      "description": "Senior developer for coding, architecture, and feature implementation",
+      "mode": "subagent",
+      "prompt": "{file:.github/agents/dev-task-executor.agent.md}",
+      "permission": "allow"
+    },
+    "enterprise-architect-expert": {
+      "description": "Senior architect for complex system design and strategic technical decisions",
+      "mode": "subagent",
+      "prompt": "{file:.github/agents/enterprise-architect-expert.agent.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": "allow"
+      }
+    }
+  },
+  "permission": {
+    "skill": {
+      "*": "allow"
+    }
+  }
+}

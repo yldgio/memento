@@ -1,2 +1,39 @@
 PowerShellEditorServices.json
 .vscode/settings.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker
+*.log

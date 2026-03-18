@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  memento-api:
+    build: .
+    command: ["python", "-m", "memento.main"]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      - MEMENTO_LLM_BASE_URL=${MEMENTO_LLM_BASE_URL}
+      - MEMENTO_LLM_MODEL=${MEMENTO_LLM_MODEL}
+      - MEMENTO_LLM_API_KEY=${MEMENTO_LLM_API_KEY}
+      - MEMENTO_FALKORDB_HOST=falkordb
+      - MEMENTO_FALKORDB_PORT=6379
+      - MEMENTO_CONFIDENCE_THRESHOLD=${MEMENTO_CONFIDENCE_THRESHOLD:-0.6}
+      - MEMENTO_SESSION_TIMEOUT=${MEMENTO_SESSION_TIMEOUT:-3600}
+    depends_on:
+      - falkordb
+    volumes:
+      - mem0-data:/data/mem0
+      - memento-data:/data/memento
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - falkordb-data:/data
+
+  scheduler:
+    build: .
+    command: ["python", "-m", "memento.scheduler"]
+    environment:
+      - MEMENTO_LLM_BASE_URL=${MEMENTO_LLM_BASE_URL}
+      - MEMENTO_LLM_MODEL=${MEMENTO_LLM_MODEL}
+      - MEMENTO_LLM_API_KEY=${MEMENTO_LLM_API_KEY}
+      - MEMENTO_FALKORDB_HOST=falkordb
+      - MEMENTO_FALKORDB_PORT=6379
+      - MEMENTO_CONSOLIDATION_SCHEDULE=${MEMENTO_CONSOLIDATION_SCHEDULE:-*/30 * * * *}
+      - MEMENTO_ANALYTICS_SCHEDULE=${MEMENTO_ANALYTICS_SCHEDULE:-0 2 * * 0}
+    depends_on:
+      - falkordb
+
+volumes:
+  falkordb-data:
+  mem0-data:
+  memento-data:

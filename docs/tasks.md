@@ -50,7 +50,8 @@ P0-T01 (project scaffold)
 **Depends on**: Nothing (first task)
 
 **Files to create**:
-```
+
+```text
 memento/
 ├── pyproject.toml            # Python project config (hatchling or setuptools)
 ├── Dockerfile                # Multi-stage build: deps → app
@@ -68,12 +69,14 @@ memento/
 ```
 
 **Acceptance criteria**:
+
 - `pip install -e .` succeeds
 - `python -m memento.main` starts without error (may exit immediately — no routes yet)
 - `docker build .` produces a valid image
 - `pytest` runs with zero tests collected, zero errors
 
 **Details**:
+
 - Python ≥ 3.11
 - Dependencies: `fastapi`, `uvicorn`, `mcp[server]`, `graphiti-core`, `mem0ai`, `pydantic`, `httpx`
 - Dev dependencies: `pytest`, `pytest-asyncio`, `ruff`, `mypy`
@@ -93,15 +96,18 @@ memento/
 **Implements**: §10 Configuration (all `MEMENTO_*` env vars)
 
 **Acceptance criteria**:
+
 - All env vars from TRD §10 are represented as typed fields
 - Missing required vars (`MEMENTO_LLM_API_KEY`) raise clear error at startup
 - Defaults match TRD §10 table
 - Unit tests validate defaults, required field enforcement, type coercion
 
 **Details**:
+
 - Use `pydantic-settings` (`BaseSettings`) for env var parsing
 - Single `Settings` class, singleton via `@lru_cache`
 - Fields:
+
   ```python
   llm_base_url: str = "https://api.openai.com/v1"
   llm_model: str = "gpt-4o"
@@ -121,9 +127,11 @@ memento/
   mcp_token: str | None = None        # optional MCP auth
   org_promotion_min_sessions: int = 2
   ```
+
 - Prefix: `MEMENTO_` (pydantic-settings `env_prefix`)
 
 **Tests**: `tests/unit/test_config.py`
+
 - Test defaults match TRD
 - Test missing required key raises `ValidationError`
 - Test env override works
@@ -141,6 +149,7 @@ memento/
 **Implements**: TRD §4 (MemoryObject, Provenance, SessionLog, Observation, enums, Graphiti entity/edge types)
 
 **Acceptance criteria**:
+
 - All data classes from §4.1–§4.7 are defined as Pydantic models
 - Enums: `Scope`, `Lifetime`, `Cell`, `TrustTier`, `SessionStatus`
 - `SessionStatus` includes `ACTIVE | ENDED | TIMED_OUT | CONSOLIDATED`
@@ -152,6 +161,7 @@ memento/
 - Unit tests for enum ordering, serialization round-trip, validation constraints
 
 **Details**:
+
 - `MemoryObject.confidence` constrained to `[0.0, 1.0]` via `Field(ge=0, le=1)`
 - `Provenance.promotion_decisions` is `list[PromotionDecision]`
 - `SessionLog.observations` is `list[Observation]`
@@ -159,6 +169,7 @@ memento/
 - Timestamps use `datetime` with UTC enforcement
 
 **Tests**: `tests/unit/test_schema.py`
+
 - Enum comparisons (`TrustTier.REVIEWED > TrustTier.UNVERIFIED`)
 - Valid/invalid MemoryObject construction
 - Provenance serialization round-trip
@@ -179,6 +190,7 @@ memento/
 **Implements**: TRD §9.1, §9.2
 
 **Acceptance criteria**:
+
 - `docker compose up` starts 3 services: `memento-api`, `falkordb`, `scheduler`
 - FalkorDB is reachable on port 6379
 - Memento API responds on port 8080
@@ -187,6 +199,7 @@ memento/
 - `.env.example` covers all required vars
 
 **Details**:
+
 - Exact YAML from TRD §9.2 as starting point
 - FalkorDB image: `falkordb/falkordb:latest`
 - Both `memento-api` and `scheduler` build from same Dockerfile, different `command`
@@ -206,6 +219,7 @@ memento/
 **Implements**: TRD §6.3 `MemoryStore` protocol, Graphiti-specific implementation
 
 **Acceptance criteria**:
+
 - `MemoryStore` protocol defined in `base.py` matching TRD §6.3
 - `GraphitiStore` implements all 5 methods: `add`, `search`, `get`, `invalidate`, `update_trust_tier`
 - Custom entity types registered: `Incident`, `Learning`, `AntiPattern`, `Policy`
@@ -216,6 +230,7 @@ memento/
 - Integration test with real FalkorDB (via docker compose)
 
 **Details**:
+
 - Constructor takes `host`, `port`, initializes `Graphiti(...)` with FalkorDB config
 - `async def initialize()` — calls `graphiti.build_indices_and_constraints()`
 - `add()` — creates episode via `graphiti.add_episode()`, stores MemoryObject metadata
@@ -225,6 +240,7 @@ memento/
 - Connection pooling: reuse single Graphiti instance per store
 
 **Tests**:
+
 - `tests/unit/test_graphiti_store.py` — mock Graphiti client, verify correct calls
 - `tests/integration/test_graphiti_store.py` — real FalkorDB (requires docker)
 
@@ -241,6 +257,7 @@ memento/
 **Implements**: TRD §6.3 `MemoryStore` protocol, Mem0-specific implementation
 
 **Acceptance criteria**:
+
 - `Mem0Store` implements all 5 methods of `MemoryStore` protocol
 - Namespace isolation: each project uses `user_id="project:{project_id}"`
 - `add()` stores MemoryObject with metadata (provenance, trust_tier, confidence)
@@ -250,8 +267,10 @@ memento/
 - `update_trust_tier()` updates metadata on the stored memory
 
 **Details**:
+
 - Constructor takes `Settings`, initializes `Memory.from_config(config)` with LLM provider settings
 - Config maps `MEMENTO_LLM_*` to Mem0's expected config format:
+
   ```python
   config = {
       "llm": {
@@ -260,10 +279,12 @@ memento/
       }
   }
   ```
+
 - Metadata stored alongside memory: `confidence`, `trust_tier`, `provenance_session_id`, `tags`
 - `search()` filters by `trust_tier_min` post-retrieval (Mem0 doesn't natively filter by custom metadata)
 
 **Tests**:
+
 - `tests/unit/test_mem0_store.py` — mock Mem0 client, verify namespace isolation
 - `tests/integration/test_mem0_store.py` — real Mem0 (embedded, no external service needed)
 
@@ -280,6 +301,7 @@ memento/
 **Implements**: FR-LOG-01, FR-LOG-03, FR-LOG-04, FR-LOG-05
 
 **Acceptance criteria**:
+
 - `SessionStore` manages `SessionLog` objects in SQLite (shared persistent storage — required because the scheduler runs as a separate process and must discover `ENDED` sessions)
 - `create_session()` → returns `SessionLog` with status `ACTIVE`; `agent_id`, `project_id`, and `task_description` are set at creation and immutable thereafter (FR-LOG-04)
 - `append_observation()` → appends `Observation` to session, validates session is `ACTIVE`
@@ -291,6 +313,7 @@ memento/
 - Metadata immutability: attempts to change `agent_id`, `project_id`, or `task_description` after creation are rejected
 
 **Details**:
+
 - SQLite database at `MEMENTO_DATA_DIR/sessions.db` (volume-mounted in Docker Compose)
 - Tables: `sessions` (metadata + status) and `observations` (append-only, foreign key to sessions)
 - Thread-safe via SQLite WAL mode + `aiosqlite` for async access
@@ -298,6 +321,7 @@ memento/
 - The scheduler process connects to the same SQLite file to discover `ENDED` sessions
 
 **Tests**: `tests/unit/test_session_store.py`
+
 - Create + append + end lifecycle
 - Reject append on ended session
 - Timeout expiry
@@ -317,6 +341,7 @@ memento/
 **Implements**: FR-MCP-01–04, FR-CTX-01, FR-CTX-06
 
 **Acceptance criteria**:
+
 - MCP server starts on both `stdio` and `streamable-http` transports
 - 3 tools registered: `memento_context_assemble`, `memento_session_log`, `memento_session_end` (note: `memento_query` is P1 per TRD §12)
 - `list_tools` returns all 3 tools with input schemas auto-generated from type hints
@@ -326,6 +351,7 @@ memento/
 - Error handling: invalid session_id → MCP error
 
 **Details**:
+
 - Use `mcp.server.fastmcp.FastMCP` with `@mcp.tool()` decorators
 - Tool signatures exactly match TRD §6.1
 - Context assembly logic (Phase 0 simplified):
@@ -337,6 +363,7 @@ memento/
 - Connection to stores via dependency injection (constructor receives store instances)
 
 **Tests**:
+
 - `tests/unit/test_mcp_server.py` — mock stores, test each tool's logic
 - `tests/integration/test_mcp_server.py` — real MCP client connecting via stdio
 
@@ -353,6 +380,7 @@ memento/
 **This is the highest-risk component** — it's where memory quality is determined.
 
 **Acceptance criteria**:
+
 - Given a `SessionLog`, extracts discrete `MemoryObject` candidates via LLM
 - Each candidate has `confidence` score assigned by LLM
 - Candidates with `confidence < MEMENTO_CONFIDENCE_THRESHOLD` are stored as `UNVERIFIED` with `rejected_at` and reason
@@ -368,7 +396,9 @@ memento/
 - Session status set to `CONSOLIDATED` after successful run
 
 **Details**:
+
 - LLM prompt design (critical — this determines memory quality):
+
   ```
   You are a knowledge extraction engine. Given a session log from an AI coding agent,
   extract discrete, actionable learnings. For each learning:
@@ -379,12 +409,14 @@ memento/
   
   Return JSON array of candidates.
   ```
+
 - LLM call via `httpx` to `MEMENTO_LLM_BASE_URL` (OpenAI-compatible chat completions)
 - No vendor SDK — raw HTTP to `/v1/chat/completions`
 - Deduplication: embed candidate text, cosine similarity against existing Mem0/Graphiti entries, threshold 0.9 = duplicate
 - Batch ID: UUID generated per consolidation run
 
 **Tests**:
+
 - `tests/unit/test_consolidation.py`:
   - Mock LLM returns known candidates → verify routing to correct store
   - Below-threshold candidate → stored as UNVERIFIED
@@ -405,6 +437,7 @@ memento/
 **Implements**: FR-CON-10
 
 **Acceptance criteria**:
+
 - Scheduler runs as separate process (`python -m memento.scheduler`)
 - Executes consolidation job on cron schedule (`MEMENTO_CONSOLIDATION_SCHEDULE`)
 - Connects to same SQLite session store to find sessions with status `ENDED` (not yet consolidated)
@@ -412,12 +445,14 @@ memento/
 - Logs each run (session_id, duration, memories extracted/promoted)
 
 **Details**:
+
 - Use `APScheduler` or simple `asyncio` loop with cron parsing
 - Keep it simple for Phase 0 — `while True: sleep(interval); find_ended_sessions(); consolidate_each()`
 - Shares same SQLite database and store initialization as `main.py` (via shared volume)
 - No analytics job in Phase 0 (that's Phase 2)
 
 **Tests**: `tests/unit/test_scheduler.py`
+
 - Mock clock + mock consolidation → verify sessions are picked up and processed
 
 ---
@@ -431,11 +466,13 @@ memento/
 **Implements**: FR-API-08
 
 **Acceptance criteria**:
+
 - `GET /health` returns 200 with JSON: `{ "status": "ok", "components": { "graphiti": "ok|error", "mem0": "ok|error", "llm": "ok|error" } }`
 - Each component is health-checked (Graphiti: ping FalkorDB, Mem0: check initialized, LLM: verify base_url reachable)
 - If any component is unhealthy, top-level status is `"degraded"` (not 500 — the service still works partially)
 
 **Details**:
+
 - FastAPI route in `main.py`
 - Timeout each health check at 5s
 - Used by Docker Compose `healthcheck` directive
@@ -455,6 +492,7 @@ memento/
 **Implements**: TRD §11.2
 
 **Acceptance criteria**:
+
 - Test: MCP client connects → discovers tools → each tool responds correctly
 - Test: Session lifecycle: create via `context_assemble` → log observations → end session → session status is ENDED → session summary returned
 - Test: Consolidation pipeline (Mem0 path): ended session with project-specific observations → consolidation → memories appear in Mem0
@@ -464,6 +502,7 @@ memento/
 - All tests run against Docker Compose stack (FalkorDB real, LLM mocked)
 
 **Details**:
+
 - Fixture: start Docker Compose stack (or use existing), wait for health
 - LLM mock: intercept `MEMENTO_LLM_BASE_URL` with `httpx` mock or local test server
 - Test isolation: unique project IDs per test to avoid cross-contamination
@@ -481,6 +520,7 @@ memento/
 
 **Acceptance criteria**:
 The complete sequence works:
+
 1. Agent (MCP client) calls `memento_context_assemble(project="test-project", task="implement auth")` → gets empty context (no prior memories)
 2. Agent logs observations: `memento_session_log(session_id, "JWT tokens need 15-min expiry for this API", agent_id="test-agent")`
 3. Agent ends session: `memento_session_end(session_id)`
@@ -489,6 +529,7 @@ The complete sequence works:
 6. Verify: the returned context contains a memory with content referencing "JWT" and "15-min expiry"
 
 **Details**:
+
 - This is the proof that the core loop works
 - Runs against full Docker Compose stack with real FalkorDB
 - LLM can be real (slow, costs money) or mocked (fast, deterministic) — support both via env flag
@@ -602,6 +643,7 @@ Sequential:                                                          P0-T08 (MCP
 **Status**: Complete
 
 **Evidence**:
+
 - `python -m pytest` → 79 passed
 - `python -m ruff check memento tests` → passed
 - `docker build .` → passed
@@ -610,4 +652,5 @@ Sequential:                                                          P0-T08 (MCP
 - `tests/unit/test_schema.py` now verifies UTC enforcement for timestamp fields required by `P0-T03`
 
 **Interpretation note**:
+
 - `P0-T04` now explicitly records the infrastructure-only MCP expectation so Batch A verification stays aligned with the later `P0-T08` MCP implementation task.

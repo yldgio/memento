@@ -7,6 +7,7 @@ into a typed Settings object. Access via ``get_settings()`` singleton.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,6 +59,9 @@ class Settings(BaseSettings):
 
     # --- Promotion ---
     org_promotion_min_sessions: int = 2
+
+    # --- Data Storage ---
+    data_dir: Path = Path("/data")
 
 
 @lru_cache(maxsize=1)

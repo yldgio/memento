@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -33,6 +35,7 @@ class TestSettingsDefaults:
         assert settings.api_key is None
         assert settings.mcp_token is None
         assert settings.org_promotion_min_sessions == 2
+        assert settings.data_dir == Path("/data")
 
 
 class TestSettingsRequired:
@@ -94,6 +97,8 @@ class TestSettingsEnvOverride:
 
         settings = Settings()  # type: ignore[call-arg]
 
+        assert settings.api_key is not None
+        assert settings.mcp_token is not None
         assert settings.api_key.get_secret_value() == "my-api-key"
         assert settings.mcp_token.get_secret_value() == "my-mcp-token"
 
@@ -105,6 +110,15 @@ class TestSettingsEnvOverride:
         settings = Settings()  # type: ignore[call-arg]
 
         assert settings.log_level == "DEBUG"
+
+    def test_env_override_data_dir(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """MEMENTO_DATA_DIR env var should override the default /data path."""
+        monkeypatch.setenv("MEMENTO_LLM_API_KEY", "test-key")
+        monkeypatch.setenv("MEMENTO_DATA_DIR", "/custom/data")
+
+        settings = Settings()  # type: ignore[call-arg]
+
+        assert settings.data_dir == Path("/custom/data")
 
 
 class TestGetSettingsSingleton:

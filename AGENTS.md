@@ -9,7 +9,7 @@
 ## Stack and runtime
 
 - Python `>=3.11`, packaged with `hatchling` (`pyproject.toml`).
-- Core libraries: `fastapi`, `uvicorn`, `mcp`, `graphiti-core`, `mem0ai`, `pydantic`, `pydantic-settings`, `httpx`.
+- Core libraries: `fastapi`, `uvicorn`, `mcp`, `graphiti-core`, `mem0ai`, `aiosqlite`, `pydantic`, `pydantic-settings`, `httpx`.
 - Tooling: `pytest`, `pytest-asyncio`, `ruff`, `mypy`.
 - Container/dev runtime: `Dockerfile`, `docker-compose.yml`, `.env.example`.
 
@@ -19,7 +19,9 @@
 - `memento/main.py` — FastAPI entrypoint.
 - `memento/config.py` — `MEMENTO_*` environment-driven settings.
 - `memento/memory/schema.py` — core enums and Pydantic models for the memory platform.
-- `tests/unit/` — unit coverage for config and schema behavior.
+- `memento/stores/` — shared store protocol plus Graphiti, Mem0, and SQLite session-store backends.
+- `tests/unit/` — unit coverage for config, schema, and store behavior.
+- `tests/integration/` — integration coverage for backend adapters when external/runtime dependencies are available.
 - `docs/TRD.md` — technical requirements source of truth.
 - `docs/tasks.md` — implementation backlog and sequencing.
 - `.github/agents/` — Copilot-specific agent definitions.
@@ -57,7 +59,7 @@
 
 - `memento/config.py` is the central settings contract; avoid ad hoc environment parsing elsewhere.
 - `memento/memory/schema.py` reflects the domain model from `docs/TRD.md`; keep those aligned.
-- The current app surface is scaffold-level: API entrypoint, scheduler stub, config, schema, and Docker stack are present, while deeper memory-store integrations are planned work.
+- The current app surface includes the API entrypoint, scheduler stub, config, schema, and Batch B store adapters; MCP server, consolidation job, and later orchestration layers are still planned work.
 - Use `docs/tasks.md` to understand delivery order before adding new subsystems.
 
 ## Agent workflow

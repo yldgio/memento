@@ -212,6 +212,8 @@ memento/
 
 ### P0-T05 · Graphiti Store Wrapper 🟡
 
+**Status**: Complete — verified by Batch B evidence below
+
 **Creates**: `memento/stores/graphiti_store.py`, `memento/stores/__init__.py`, `memento/stores/base.py`
 
 **Depends on**: P0-T03 (needs MemoryObject, Provenance, Graphiti entity types)
@@ -249,6 +251,8 @@ memento/
 ---
 
 ### P0-T06 · Mem0 Store Wrapper 🟡
+
+**Status**: Complete — verified by Batch B evidence below
 
 **Creates**: `memento/stores/mem0_store.py`
 
@@ -294,6 +298,8 @@ memento/
 
 ### P0-T07 · Session Store 🟡
 
+**Status**: Complete — verified by Batch B evidence below
+
 **Creates**: `memento/stores/session_store.py`
 
 **Depends on**: P0-T03 (needs SessionLog, Observation, SessionStatus enums)
@@ -329,6 +335,23 @@ memento/
 - Concurrent access: two async tasks can read/write without corruption
 
 **Parallelizable with**: P0-T05, P0-T06
+
+---
+
+### Batch B Verification
+
+**Status**: Complete
+
+**Evidence**:
+
+- `python -m pytest tests\unit\test_graphiti_store.py tests\unit\test_mem0_store.py tests\unit\test_session_store.py tests\unit\test_config.py tests\integration\test_graphiti_store.py tests\integration\test_mem0_store.py` → 172 passed, 18 skipped
+- `python -m ruff check memento tests` → passed
+- `python -m mypy memento\stores tests\unit\test_graphiti_store.py tests\unit\test_mem0_store.py tests\unit\test_session_store.py tests\unit\test_config.py` → Success: no issues found in 9 source files
+- Single `code-review` pass for this 🟡 batch found no substantive correctness, reliability, or security issues
+
+**Interpretation note**:
+
+- Integration coverage for Graphiti and Mem0 remains environment-gated; the focused verification above confirms the wrappers, config wiring, and unit-level behavior, while the integration tests skip cleanly when FalkorDB and LLM credentials are not present.
 
 ---
 

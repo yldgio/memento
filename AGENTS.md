@@ -20,7 +20,8 @@
 - `memento/config.py` — `MEMENTO_*` environment-driven settings.
 - `memento/memory/schema.py` — core enums and Pydantic models for the memory platform.
 - `memento/stores/` — shared store protocol plus Graphiti, Mem0, and SQLite session-store backends.
-- `tests/unit/` — unit coverage for config, schema, and store behavior.
+- `memento/mcp/` — MCP server package; `server.py` exposes tools via `mcp.server.fastmcp.FastMCP`.
+- `tests/unit/` — unit coverage for config, schema, store behavior, and MCP tool logic.
 - `tests/integration/` — integration coverage for backend adapters when external/runtime dependencies are available.
 - `docs/TRD.md` — technical requirements source of truth.
 - `docs/tasks.md` — implementation backlog and sequencing.
@@ -59,7 +60,7 @@
 
 - `memento/config.py` is the central settings contract; avoid ad hoc environment parsing elsewhere.
 - `memento/memory/schema.py` reflects the domain model from `docs/TRD.md`; keep those aligned.
-- The current app surface includes the API entrypoint, scheduler stub, config, schema, and Batch B store adapters; MCP server, consolidation job, and later orchestration layers are still planned work.
+- The current app surface includes the API entrypoint, scheduler stub, config, schema, Batch B store adapters, and the MCP server (Batch C); consolidation job and later orchestration layers are still planned work.
 - Use `docs/tasks.md` to understand delivery order before adding new subsystems.
 
 ## Agent workflow

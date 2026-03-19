@@ -65,6 +65,7 @@ _DDL_OBSERVATIONS = """
 CREATE TABLE IF NOT EXISTS observations (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL REFERENCES sessions(session_id),
+    observation_index INTEGER,
     timestamp  TEXT NOT NULL,
     content    TEXT NOT NULL,
     tags       TEXT NOT NULL DEFAULT '[]',
@@ -74,6 +75,11 @@ CREATE TABLE IF NOT EXISTS observations (
 
 _DDL_OBS_IDX = """
 CREATE INDEX IF NOT EXISTS obs_session_idx ON observations (session_id)
+"""
+
+_DDL_OBS_POSITION_IDX = """
+CREATE UNIQUE INDEX IF NOT EXISTS obs_session_position_idx
+ON observations (session_id, observation_index)
 """
 
 
@@ -127,6 +133,7 @@ class SessionStore:
         self._expiry_interval = expiry_interval
         self._conn: aiosqlite.Connection | None = None
         self._expiry_task: asyncio.Task[None] | None = None
+        self._write_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -143,6 +150,8 @@ class SessionStore:
         await self._conn.execute(_DDL_SESSIONS)
         await self._conn.execute(_DDL_OBSERVATIONS)
         await self._conn.execute(_DDL_OBS_IDX)
+        await self._ensure_observation_index_column(self._conn)
+        await self._conn.execute(_DDL_OBS_POSITION_IDX)
         await self._conn.commit()
 
     async def close(self) -> None:
@@ -209,7 +218,7 @@ class SessionStore:
         self,
         session_id: str,
         observation: Observation,
-    ) -> None:
+    ) -> int:
         """Append *observation* to the given session.
 
         Observations are append-only: this method never modifies or removes
@@ -223,21 +232,48 @@ class SessionStore:
             If the session is not currently ACTIVE.
         """
         conn = self._require_conn()
-        await self._assert_active(conn, session_id)
-        await conn.execute(
-            """
-            INSERT INTO observations (session_id, timestamp, content, tags, context)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                session_id,
-                observation.timestamp.isoformat(),
-                observation.content,
-                json.dumps(observation.tags),
-                json.dumps(observation.context) if observation.context is not None else None,
-            ),
-        )
-        await conn.commit()
+        async with self._write_lock:
+            await conn.execute("BEGIN IMMEDIATE")
+            try:
+                await self._assert_active(conn, session_id)
+                async with conn.execute(
+                    "SELECT COALESCE(MAX(observation_index), 0) + 1 AS next_index"
+                    " FROM observations WHERE session_id = ?",
+                    (session_id,),
+                ) as cur:
+                    row = await cur.fetchone()
+                assert row is not None
+                observation_index = int(row["next_index"])
+                await conn.execute(
+                    """
+                    INSERT INTO observations (
+                        session_id,
+                        observation_index,
+                        timestamp,
+                        content,
+                        tags,
+                        context
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        session_id,
+                        observation_index,
+                        observation.timestamp.isoformat(),
+                        observation.content,
+                        json.dumps(observation.tags),
+                        (
+                            json.dumps(observation.context)
+                            if observation.context is not None
+                            else None
+                        ),
+                    ),
+                )
+                await conn.commit()
+                return observation_index
+            except Exception:
+                await conn.rollback()
+                raise
 
     async def end_session(self, session_id: str) -> SessionLog:
         """Transition an ACTIVE session to ENDED.
@@ -255,13 +291,19 @@ class SessionStore:
             The updated session with status ``ENDED`` and ``ended_at`` set.
         """
         conn = self._require_conn()
-        await self._assert_active(conn, session_id)
-        ended_at = datetime.now(UTC)
-        await conn.execute(
-            "UPDATE sessions SET status = ?, ended_at = ? WHERE session_id = ?",
-            (str(SessionStatus.ENDED), ended_at.isoformat(), session_id),
-        )
-        await conn.commit()
+        async with self._write_lock:
+            await conn.execute("BEGIN IMMEDIATE")
+            try:
+                await self._assert_active(conn, session_id)
+                ended_at = datetime.now(UTC)
+                await conn.execute(
+                    "UPDATE sessions SET status = ?, ended_at = ? WHERE session_id = ?",
+                    (str(SessionStatus.ENDED), ended_at.isoformat(), session_id),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
         result = await self.get_session(session_id)
         assert result is not None  # just ended it, can't be missing
         return result
@@ -334,29 +376,37 @@ class SessionStore:
         timeout_secs = self._effective_timeout()
         now = datetime.now(UTC)
 
-        async with conn.execute(
-            "SELECT session_id, started_at FROM sessions WHERE status = ?",
-            (str(SessionStatus.ACTIVE),),
-        ) as cur:
-            active_rows = await cur.fetchall()
+        async with self._write_lock:
+            await conn.execute("BEGIN IMMEDIATE")
+            try:
+                async with conn.execute(
+                    "SELECT session_id, started_at FROM sessions WHERE status = ?",
+                    (str(SessionStatus.ACTIVE),),
+                ) as cur:
+                    active_rows = await cur.fetchall()
 
-        expired: list[str] = []
-        for row in active_rows:
-            started_at = datetime.fromisoformat(row["started_at"])
-            elapsed = (now - started_at).total_seconds()
-            if elapsed >= timeout_secs:
-                expired.append(row["session_id"])
+                expired: list[str] = []
+                for row in active_rows:
+                    started_at = datetime.fromisoformat(row["started_at"])
+                    elapsed = (now - started_at).total_seconds()
+                    if elapsed >= timeout_secs:
+                        expired.append(row["session_id"])
 
-        if expired:
-            placeholders = ",".join("?" * len(expired))
-            await conn.execute(
-                f"UPDATE sessions SET status = ?, ended_at = ?"
-                f" WHERE session_id IN ({placeholders})",
-                [str(SessionStatus.TIMED_OUT), now.isoformat(), *expired],
-            )
-            await conn.commit()
-            for sid in expired:
-                logger.info("Session %s set to TIMED_OUT", sid)
+                if expired:
+                    placeholders = ",".join("?" * len(expired))
+                    await conn.execute(
+                        f"UPDATE sessions SET status = ?, ended_at = ?"
+                        f" WHERE session_id IN ({placeholders})",
+                        [str(SessionStatus.TIMED_OUT), now.isoformat(), *expired],
+                    )
+                    await conn.commit()
+                    for sid in expired:
+                        logger.info("Session %s set to TIMED_OUT", sid)
+                else:
+                    await conn.rollback()
+            except Exception:
+                await conn.rollback()
+                raise
 
         return expired
 
@@ -442,7 +492,8 @@ class SessionStore:
     ) -> list[Observation]:
         async with conn.execute(
             "SELECT timestamp, content, tags, context"
-            " FROM observations WHERE session_id = ? ORDER BY id",
+            " FROM observations WHERE session_id = ?"
+            " ORDER BY observation_index, id",
             (session_id,),
         ) as cur:
             rows = await cur.fetchall()
@@ -460,6 +511,30 @@ class SessionStore:
                 )
             )
         return result
+
+    @staticmethod
+    async def _ensure_observation_index_column(conn: aiosqlite.Connection) -> None:
+        async with conn.execute("PRAGMA table_info(observations)") as cur:
+            columns = await cur.fetchall()
+        column_names = {row["name"] for row in columns}
+        if "observation_index" in column_names:
+            return
+
+        await conn.execute("ALTER TABLE observations ADD COLUMN observation_index INTEGER")
+
+        async with conn.execute(
+            "SELECT id, session_id FROM observations ORDER BY session_id, id"
+        ) as cur:
+            rows = await cur.fetchall()
+
+        counters: dict[str, int] = {}
+        for row in rows:
+            session_id = str(row["session_id"])
+            counters[session_id] = counters.get(session_id, 0) + 1
+            await conn.execute(
+                "UPDATE observations SET observation_index = ? WHERE id = ?",
+                (counters[session_id], row["id"]),
+            )
 
 
 # ---------------------------------------------------------------------------

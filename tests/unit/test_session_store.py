@@ -91,10 +91,11 @@ class TestSessionLifecycle:
         self, store: SessionStore, active_session: SessionLog
     ) -> None:
         obs = _obs("Something happened", tags=["tag1"])
-        await store.append_observation(active_session.session_id, obs)
+        observation_index = await store.append_observation(active_session.session_id, obs)
 
         loaded = await store.get_session(active_session.session_id)
         assert loaded is not None
+        assert observation_index == 1
         assert len(loaded.observations) == 1
         assert loaded.observations[0].content == "Something happened"
         assert loaded.observations[0].tags == ["tag1"]
@@ -408,10 +409,11 @@ class TestConcurrentAccess:
             store.append_observation(active_session.session_id, _obs(f"obs-{i}"))
             for i in range(10)
         ]
-        await asyncio.gather(*tasks)
+        indexes = await asyncio.gather(*tasks)
         loaded = await store.get_session(active_session.session_id)
         assert loaded is not None
         assert len(loaded.observations) == 10
+        assert sorted(indexes) == list(range(1, 11))
 
     async def test_concurrent_reads_while_writing(
         self, store: SessionStore, active_session: SessionLog
@@ -435,6 +437,28 @@ class TestConcurrentAccess:
         # All reads should complete without error
         for result in read_results:
             assert result is None or isinstance(result, SessionLog)
+
+    async def test_cross_instance_concurrent_observation_append(
+        self, tmp_path: Path
+    ) -> None:
+        """Two store instances sharing one DB assign unique indexes safely."""
+        db_path = tmp_path / "sessions.db"
+        async with SessionStore(db_path=db_path) as store1, SessionStore(db_path=db_path) as store2:
+            session = await store1.create_session(
+                agent_id="agent-1",
+                project_id="proj-x",
+                task_description="cross-instance append",
+            )
+
+            indexes = await asyncio.gather(
+                store1.append_observation(session.session_id, _obs("from-store-1")),
+                store2.append_observation(session.session_id, _obs("from-store-2")),
+            )
+
+            loaded = await store1.get_session(session.session_id)
+            assert loaded is not None
+            assert len(loaded.observations) == 2
+            assert sorted(indexes) == [1, 2]
 
     async def test_concurrent_list_and_create(self, store: SessionStore) -> None:
         """list_sessions and create_session can interleave without error."""

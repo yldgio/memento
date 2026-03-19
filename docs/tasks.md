@@ -357,6 +357,8 @@ memento/
 
 ### P0-T08 · MCP Server 🟡
 
+**Status**: Complete — verified by Batch C evidence below
+
 **Creates**: `memento/mcp/server.py`, `memento/mcp/__init__.py`
 
 **Depends on**: P0-T02 (config), P0-T05 (graphiti store), P0-T06 (mem0 store), P0-T07 (session store)
@@ -389,6 +391,26 @@ memento/
 
 - `tests/unit/test_mcp_server.py` — mock stores, test each tool's logic
 - `tests/integration/test_mcp_server.py` — real MCP client connecting via stdio
+
+---
+
+### Batch C Verification
+
+**Status**: Complete
+
+**Evidence**:
+
+- `python -m pytest tests\unit\test_mcp_server.py tests\unit\test_session_store.py -q` → 79 passed, 2 warnings
+- `python -m pytest -q` → 278 passed, 18 skipped, 3 warnings
+- `python -m ruff check memento tests` → passed
+- `python -m mypy memento --no-incremental` → Success: no issues found in 13 source files
+- `python -c "import inspect; import memento.mcp.server as s; print(inspect.iscoroutinefunction(s.run_stdio)); print(hasattr(s, '_stdio_main'))"` → `True` / `True`
+- Single `code-review` pass for this 🟡 task surfaced validation and lifecycle issues; all actionable findings were fixed before final verification
+
+**Interpretation note**:
+
+- `memento_session_end` now reports Phase 0 consolidation handoff using the ended-session lifecycle that `P0-T10`'s scheduler will scan, instead of claiming a separate external queue job exists already.
+- Reviewer feedback highlighted a future hardening gap around `memento_session_end` ownership checks, but TRD §6.1 currently fixes that tool signature without `agent_id`; treat that as follow-on auth work rather than a `P0-T08` acceptance blocker.
 
 ---
 

@@ -174,7 +174,7 @@ memento/
 - `docker compose up` starts 3 services: `memento-api`, `falkordb`, `scheduler`
 - FalkorDB is reachable on port 6379
 - Memento API responds on port 8080
-- MCP server responds on port 8081
+- Port `8081` is reserved/published for the future MCP streamable-http server delivered in `P0-T08`
 - Named volumes persist `falkordb-data`, `mem0-data`, and `memento-data` (SQLite session store)
 - `.env.example` covers all required vars
 
@@ -586,3 +586,20 @@ Sequential:                                                          P0-T08 (MCP
 ```
 
 **Estimated parallelism**: After P0-T01, the next 6 tasks (T02–T07) can run in 3 parallel lanes. From T08 onward, tasks are sequential because each builds on the previous.
+
+---
+
+### Batch A Verification
+
+**Status**: Complete
+
+**Evidence**:
+- `python -m pytest` → 79 passed
+- `python -m ruff check memento tests` → passed
+- `docker build .` → passed
+- `docker compose config` → resolved `memento-api`, `falkordb`, `scheduler`, and named volumes
+- `python -m memento.scheduler` → started and exited cleanly
+- `tests/unit/test_schema.py` now verifies UTC enforcement for timestamp fields required by `P0-T03`
+
+**Interpretation note**:
+- `P0-T04` now explicitly records the infrastructure-only MCP expectation so Batch A verification stays aligned with the later `P0-T08` MCP implementation task.

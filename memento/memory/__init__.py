@@ -18,6 +18,7 @@ from memento.memory.schema import (
     SessionStatus,
     Supersedes,
     TrustTier,
+    UtcDatetime,
     edge_type_map,
 )
 
@@ -39,5 +40,6 @@ __all__ = [
     "SessionStatus",
     "Supersedes",
     "TrustTier",
+    "UtcDatetime",
     "edge_type_map",
 ]

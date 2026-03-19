@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import enum
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 # =============================================================================
 # §4.1 Enumerations
@@ -81,13 +81,33 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _require_utc(v: datetime) -> datetime:
+    """Reject naive datetimes; normalise tz-aware datetimes to UTC.
+
+    Raises:
+        ValueError: If *v* has no timezone information (``tzinfo is None``).
+    """
+    if v.tzinfo is None:
+        raise ValueError(
+            "Timestamp must be timezone-aware. "
+            "Pass a UTC datetime, e.g. datetime.now(UTC) or "
+            "datetime(..., tzinfo=UTC)."
+        )
+    return v.astimezone(UTC)
+
+
+# Annotated datetime type that enforces UTC on every timestamp field.
+# Naive datetimes raise ValidationError; tz-aware datetimes are normalised to UTC.
+UtcDatetime = Annotated[datetime, AfterValidator(_require_utc)]
+
+
 class PromotionDecision(BaseModel):
     """Record of a trust-tier promotion decision."""
 
     from_tier: TrustTier
     to_tier: TrustTier
     decided_by: str
-    decided_at: datetime
+    decided_at: UtcDatetime
     reason: str
 
 
@@ -120,9 +140,9 @@ class MemoryObject(BaseModel):
     provenance: Provenance
     tags: list[str] = Field(default_factory=list)
     project_id: str | None = None
-    created_at: datetime = Field(default_factory=_utc_now)
-    valid_from: datetime = Field(default_factory=_utc_now)
-    valid_to: datetime | None = None
+    created_at: UtcDatetime = Field(default_factory=_utc_now)
+    valid_from: UtcDatetime = Field(default_factory=_utc_now)
+    valid_to: UtcDatetime | None = None
     superseded_by: str | None = None
     session_count: int = Field(default=1, ge=0)
 
@@ -135,7 +155,7 @@ class MemoryObject(BaseModel):
 class Observation(BaseModel):
     """A single observation within a session log."""
 
-    timestamp: datetime
+    timestamp: UtcDatetime
     content: str
     tags: list[str] = Field(default_factory=list)
     context: dict[str, Any] | None = None
@@ -148,8 +168,8 @@ class SessionLog(BaseModel):
     project_id: str
     agent_id: str
     task_description: str
-    started_at: datetime = Field(default_factory=_utc_now)
-    ended_at: datetime | None = None
+    started_at: UtcDatetime = Field(default_factory=_utc_now)
+    ended_at: UtcDatetime | None = None
     observations: list[Observation] = Field(default_factory=list)
     status: SessionStatus = SessionStatus.ACTIVE
 
@@ -165,7 +185,7 @@ class Incident(BaseModel):
     severity: str = Field(description="critical | high | medium | low")
     status: str = Field(description="active | resolved | post-mortem-complete")
     affected_projects: list[str] = Field(default_factory=list)
-    resolved_at: datetime | None = None
+    resolved_at: UtcDatetime | None = None
     root_cause: str | None = None
 
 
@@ -209,7 +229,7 @@ class Supersedes(BaseModel):
     """Graphiti edge: one entity replaces another."""
 
     reason: str
-    superseded_at: datetime
+    superseded_at: UtcDatetime
 
 
 class CausedBy(BaseModel):

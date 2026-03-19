@@ -523,8 +523,170 @@ class TestAppliesTo:
 
 
 # =============================================================================
-# Edge type map tests
+# UTC enforcement tests
 # =============================================================================
+
+
+class TestUtcEnforcement:
+    """Every timestamp field must reject naive datetimes (tzinfo is None)
+    and normalise tz-aware datetimes to UTC."""
+
+    # -- Observation -----------------------------------------------------------
+
+    def test_observation_naive_timestamp_rejected(self) -> None:
+        """Confirmed blocker: naive Observation.timestamp must raise."""
+        with pytest.raises(ValidationError, match="timezone"):
+            Observation(timestamp=datetime(2024, 1, 1), content="x")
+
+    def test_observation_utc_timestamp_accepted(self) -> None:
+        obs = Observation(timestamp=datetime(2024, 1, 1, tzinfo=UTC), content="x")
+        assert obs.timestamp.tzinfo is not None
+
+    def test_observation_non_utc_normalised(self) -> None:
+        """Tz-aware non-UTC datetimes are coerced to UTC, not rejected."""
+        from datetime import timedelta, timezone
+
+        est = timezone(timedelta(hours=-5))
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=est)  # noon EST = 17:00 UTC
+        obs = Observation(timestamp=dt, content="x")
+        assert obs.timestamp.tzinfo == UTC
+        assert obs.timestamp.hour == 17
+
+    # -- PromotionDecision -----------------------------------------------------
+
+    def test_promotion_decision_naive_decided_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            PromotionDecision(
+                from_tier=TrustTier.UNVERIFIED,
+                to_tier=TrustTier.REVIEWED,
+                decided_by="job",
+                decided_at=datetime(2024, 1, 1),  # naive
+                reason="test",
+            )
+
+    def test_promotion_decision_utc_accepted(self) -> None:
+        pd = PromotionDecision(
+            from_tier=TrustTier.UNVERIFIED,
+            to_tier=TrustTier.REVIEWED,
+            decided_by="job",
+            decided_at=datetime(2024, 1, 1, tzinfo=UTC),
+            reason="test",
+        )
+        assert pd.decided_at.tzinfo == UTC
+
+    # -- MemoryObject ----------------------------------------------------------
+
+    def test_memory_object_naive_created_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            _make_memory_object(created_at=datetime(2024, 1, 1))
+
+    def test_memory_object_naive_valid_from_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            _make_memory_object(valid_from=datetime(2024, 1, 1))
+
+    def test_memory_object_naive_valid_to_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            _make_memory_object(valid_to=datetime(2024, 1, 1))
+
+    def test_memory_object_utc_valid_to_accepted(self) -> None:
+        mem = _make_memory_object(valid_to=datetime(2025, 1, 1, tzinfo=UTC))
+        assert mem.valid_to is not None
+        assert mem.valid_to.tzinfo == UTC
+
+    def test_memory_object_defaults_are_utc(self) -> None:
+        """Default-generated timestamps (via _utc_now) must be UTC-aware."""
+        payload = _make_memory_object().model_dump()
+        payload.pop("created_at")
+        payload.pop("valid_from")
+        mem = MemoryObject(**payload)
+        assert mem.created_at.tzinfo == UTC
+        assert mem.valid_from.tzinfo == UTC
+
+    # -- SessionLog ------------------------------------------------------------
+
+    def test_session_log_naive_started_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            SessionLog(
+                session_id="s",
+                project_id="p",
+                agent_id="a",
+                task_description="t",
+                started_at=datetime(2024, 1, 1),  # naive
+            )
+
+    def test_session_log_naive_ended_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            SessionLog(
+                session_id="s",
+                project_id="p",
+                agent_id="a",
+                task_description="t",
+                ended_at=datetime(2024, 1, 1),  # naive
+            )
+
+    def test_session_log_utc_timestamps_accepted(self) -> None:
+        now = datetime.now(UTC)
+        log = SessionLog(
+            session_id="s",
+            project_id="p",
+            agent_id="a",
+            task_description="t",
+            started_at=now,
+            ended_at=now,
+        )
+        assert log.started_at.tzinfo == UTC
+        assert log.ended_at is not None
+        assert log.ended_at.tzinfo == UTC
+
+    # -- Supersedes ------------------------------------------------------------
+
+    def test_supersedes_naive_superseded_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            Supersedes(reason="test", superseded_at=datetime(2024, 1, 1))
+
+    def test_supersedes_utc_accepted(self) -> None:
+        edge = Supersedes(
+            reason="test", superseded_at=datetime(2024, 1, 1, tzinfo=UTC)
+        )
+        assert edge.superseded_at.tzinfo == UTC
+
+    # -- Incident --------------------------------------------------------------
+
+    def test_incident_naive_resolved_at_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="timezone"):
+            Incident(
+                severity="low",
+                status="resolved",
+                resolved_at=datetime(2024, 1, 1),  # naive
+            )
+
+    def test_incident_utc_resolved_at_accepted(self) -> None:
+        inc = Incident(
+            severity="low",
+            status="resolved",
+            resolved_at=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        assert inc.resolved_at is not None
+        assert inc.resolved_at.tzinfo == UTC
+
+    # -- Round-trip: UTC-enforced fields survive JSON serialization -----------
+
+    def test_observation_utc_round_trip(self) -> None:
+        """UTC timestamp survives JSON serialization and back."""
+        obs = Observation(
+            timestamp=datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC), content="x"
+        )
+        restored = Observation.model_validate_json(obs.model_dump_json())
+        assert restored.timestamp.tzinfo == UTC
+        assert restored.timestamp == obs.timestamp
+
+    def test_naive_string_in_json_rejected(self) -> None:
+        """A timezone-naïve ISO string in JSON must be rejected on parse."""
+        import json as _json
+
+        payload = _json.dumps({"timestamp": "2024-01-01T12:00:00", "content": "x"})
+        with pytest.raises(ValidationError, match="timezone"):
+            Observation.model_validate_json(payload)
 
 
 class TestEdgeTypeMap:

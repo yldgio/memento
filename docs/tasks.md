@@ -43,6 +43,8 @@ P0-T01 (project scaffold)
 
 ### P0-T01 · Project Scaffold 🟢
 
+**Status**: Complete — verified by Batch A evidence below
+
 **Creates**: Project structure, Python packaging, dev tooling
 
 **Depends on**: Nothing (first task)
@@ -81,6 +83,8 @@ memento/
 ---
 
 ### P0-T02 · Configuration Module 🟢
+
+**Status**: Complete — verified by Batch A evidence below
 
 **Creates**: `memento/config.py`
 
@@ -128,6 +132,8 @@ memento/
 
 ### P0-T03 · Data Model 🟡
 
+**Status**: Complete — verified by Batch A evidence below
+
 **Creates**: `memento/memory/schema.py`, `memento/memory/__init__.py`
 
 **Depends on**: P0-T01
@@ -163,6 +169,8 @@ memento/
 ---
 
 ### P0-T04 · Docker Compose Stack 🟢
+
+**Status**: Complete — verified by Batch A evidence below
 
 **Creates**: `docker-compose.yml`, updates `Dockerfile`
 

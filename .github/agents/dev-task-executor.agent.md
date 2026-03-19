@@ -1,5 +1,20 @@
 ---
-description: "Use this agent when the user assigns development work that requires coding, architecture decisions, or feature implementation.\n\nTrigger phrases include:\n- 'implement this feature'\n- 'fix this bug'\n- 'refactor this code'\n- 'add this functionality'\n- 'work on this task'\n- 'build out this component'\n- 'optimize this code'\n\nExamples:\n- User says 'implement user authentication for the API' → invoke this agent to design, code, test, and validate the complete feature\n- User asks 'fix the memory leak in the data loader' → invoke this agent to diagnose, implement fixes, and verify the solution\n- During code review, user says 'refactor the search module for better performance' → invoke this agent to analyze, redesign, and implement improvements with test validation"
+description: |
+   Use this agent when the user assigns development work that requires coding, architecture decisions, or feature implementation.
+
+   Trigger phrases include:
+   - 'implement this feature'
+   - 'fix this bug'
+   - 'refactor this code'
+   - 'add this functionality'
+   - 'work on this task'
+   - 'build out this component'
+   - 'optimize this code'
+
+   Examples:
+   - User says 'implement user authentication for the API' → invoke this agent to design, code, test, and validate the complete feature
+   - User asks 'fix the memory leak in the data loader' → invoke this agent to diagnose, implement fixes, and verify the solution
+   - During code review, user says 'refactor the search module for better performance' → invoke this agent to analyze, redesign, and implement improvements with test validation
 name: dev-task-executor
 model: Claude Sonnet 4.6 (copilot)
 ---

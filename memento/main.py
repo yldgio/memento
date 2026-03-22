@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
+from typing import Literal
 
+import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
 
 from memento.mcp.server import (
     create_mcp_server,
@@ -25,6 +28,83 @@ from memento.mcp.server import (
 from memento.stores.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Health check models (FR-API-08)
+# ---------------------------------------------------------------------------
+
+
+class HealthComponents(BaseModel):
+    """Per-component health statuses."""
+
+    graphiti: Literal["ok", "error"]
+    mem0: Literal["ok", "error"]
+    llm: Literal["ok", "error"]
+
+
+class HealthResponse(BaseModel):
+    """Top-level health response returned by ``GET /health`` (FR-API-08)."""
+
+    status: Literal["ok", "degraded"]
+    components: HealthComponents
+
+
+# ---------------------------------------------------------------------------
+# Health check helpers
+# ---------------------------------------------------------------------------
+
+
+async def _ping_graphiti(store: object | None) -> str:
+    """Attempt FalkorDB connectivity via the graphiti driver.
+
+    Raises :exc:`RuntimeError` (or any driver exception) on failure.
+    """
+    if store is None:
+        raise RuntimeError("graphiti store not initialised")
+    graphiti_obj = getattr(store, "_graphiti", None)
+    driver = getattr(graphiti_obj, "driver", None) if graphiti_obj is not None else None
+    if driver is None:
+        raise RuntimeError("graphiti driver not available")
+    await driver.verify_connectivity()
+    return "ok"
+
+
+async def _ping_mem0(store: object | None) -> str:
+    """Check that the Mem0 async client is initialised.
+
+    Raises :exc:`RuntimeError` if the store or its internal client is absent.
+    """
+    if store is None:
+        raise RuntimeError("mem0 store not initialised")
+    if getattr(store, "_mem", None) is None:
+        raise RuntimeError("mem0 client not initialised")
+    return "ok"
+
+
+async def _ping_llm(base_url: str) -> str:
+    """Verify the LLM base URL is network-reachable.
+
+    Any HTTP response (including 4xx/5xx) counts as reachable.
+    Raises on connection error or empty URL.
+    """
+    if not base_url:
+        raise RuntimeError("LLM base URL not configured")
+    async with httpx.AsyncClient() as client:
+        await client.get(base_url)
+    return "ok"
+
+
+async def _component_status(coro: Awaitable[str]) -> Literal["ok", "error"]:
+    """Await *coro* with a 5-second timeout.
+
+    Returns ``'ok'`` on success, ``'error'`` on any exception or timeout.
+    """
+    try:
+        await asyncio.wait_for(coro, timeout=5.0)
+        return "ok"
+    except Exception:
+        return "error"
 
 
 async def _wait_for_mcp_startup(
@@ -107,6 +187,11 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
     mcp_task = asyncio.create_task(mcp_http.serve(), name="mcp-http")
     logger.info("MCP streamable-HTTP server starting on port %d", settings.mcp_port)
 
+    # --- Expose stores and settings for the health endpoint --------------
+    application.state.graphiti_store = graphiti_store
+    application.state.mem0_store = mem0_store
+    application.state.settings = settings
+
     try:
         await _wait_for_mcp_startup(mcp_http, mcp_task)
         yield
@@ -127,6 +212,39 @@ app = FastAPI(
     version="0.1.0",
     lifespan=_lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health(request: Request) -> HealthResponse:
+    """Return health status for all backend components (FR-API-08).
+
+    Always returns HTTP 200; top-level ``status`` is ``'degraded'`` when any
+    component is unhealthy so callers can act without treating partial failures
+    as hard errors.
+    """
+    graphiti_store: object | None = getattr(request.app.state, "graphiti_store", None)
+    mem0_store: object | None = getattr(request.app.state, "mem0_store", None)
+    settings: object | None = getattr(request.app.state, "settings", None)
+    llm_base_url: str = (
+        getattr(settings, "llm_base_url", "") if settings is not None else ""
+    )
+
+    g_status, m_status, l_status = await asyncio.gather(
+        _component_status(_ping_graphiti(graphiti_store)),
+        _component_status(_ping_mem0(mem0_store)),
+        _component_status(_ping_llm(llm_base_url)),
+    )
+
+    components = HealthComponents(graphiti=g_status, mem0=m_status, llm=l_status)
+    overall: Literal["ok", "degraded"] = (
+        "ok" if g_status == m_status == l_status == "ok" else "degraded"
+    )
+    return HealthResponse(status=overall, components=components)
 
 
 def main() -> None:

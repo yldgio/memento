@@ -32,6 +32,10 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "e2e: end-to-end tests exercising the full core loop (no external services required by default)",
+    "integration: integration tests requiring external services (Mem0/Qdrant, FalkorDB)",
+]
 
 [tool.ruff]
 target-version = "py311"

@@ -18,6 +18,7 @@ Skip conditions
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -109,25 +110,37 @@ def mem0_store(_env: None) -> Any:
 
 
 @pytest.fixture
-def project_llm_client() -> httpx.AsyncClient:
+async def project_llm_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Mock HTTP client returning a single project-scope candidate."""
-    return httpx.AsyncClient(transport=MockLLMTransport([_PROJECT_CANDIDATE]))
+    client = httpx.AsyncClient(transport=MockLLMTransport([_PROJECT_CANDIDATE]))
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 @pytest.fixture
-def org_llm_client() -> httpx.AsyncClient:
+async def org_llm_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Mock HTTP client returning a single org-scope candidate."""
-    return httpx.AsyncClient(transport=MockLLMTransport([_ORG_CANDIDATE]))
+    client = httpx.AsyncClient(transport=MockLLMTransport([_ORG_CANDIDATE]))
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 @pytest.fixture
-def multi_llm_client() -> httpx.AsyncClient:
+async def multi_llm_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Mock HTTP client returning project + org + low-confidence candidates."""
-    return httpx.AsyncClient(
+    client = httpx.AsyncClient(
         transport=MockLLMTransport(
             [_PROJECT_CANDIDATE, _ORG_CANDIDATE, _LOW_CONFIDENCE_CANDIDATE]
         )
     )
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 # ---------------------------------------------------------------------------
@@ -275,31 +288,31 @@ class TestConsolidationMem0Path:
 
         from memento.jobs.consolidation import run_consolidation
 
-        low_conf_client = httpx.AsyncClient(
+        async with httpx.AsyncClient(
             transport=MockLLMTransport([_LOW_CONFIDENCE_CANDIDATE])
-        )
-        graphiti_mock = AsyncMock()
-        graphiti_mock.search = AsyncMock(return_value=[])
-        graphiti_mock.add = AsyncMock(return_value="mock-id")
+        ) as low_conf_client:
+            graphiti_mock = AsyncMock()
+            graphiti_mock.search = AsyncMock(return_value=[])
+            graphiti_mock.add = AsyncMock(return_value="mock-id")
 
-        session_log = await _create_ended_session(
-            session_store,
-            project_id=unique_project_id,
-            agent_id=unique_agent_id,
-        )
+            session_log = await _create_ended_session(
+                session_store,
+                project_id=unique_project_id,
+                agent_id=unique_agent_id,
+            )
 
-        result = await run_consolidation(
-            session_log,
-            mem0_store=mem0_store,
-            graphiti_store=graphiti_mock,  # type: ignore[arg-type]
-            session_store=session_store,
-            http_client=low_conf_client,
-        )
+            result = await run_consolidation(
+                session_log,
+                mem0_store=mem0_store,
+                graphiti_store=graphiti_mock,  # type: ignore[arg-type]
+                session_store=session_store,
+                http_client=low_conf_client,
+            )
 
-        # Low-confidence candidate counts as unverified, not promoted
-        assert result.unverified >= 1, (
-            f"Expected at least 1 unverified memory; got {result.unverified}"
-        )
+            # Low-confidence candidate counts as unverified, not promoted
+            assert result.unverified >= 1, (
+                f"Expected at least 1 unverified memory; got {result.unverified}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -221,8 +221,12 @@ def mock_llm_candidates() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def mock_llm_http_client(
+async def mock_llm_http_client(
     mock_llm_candidates: list[dict[str, Any]],
-) -> httpx.AsyncClient:
+) -> AsyncGenerator[httpx.AsyncClient, None]:
     """An ``httpx.AsyncClient`` wired to the mock LLM transport."""
-    return httpx.AsyncClient(transport=MockLLMTransport(mock_llm_candidates))
+    client = httpx.AsyncClient(transport=MockLLMTransport(mock_llm_candidates))
+    try:
+        yield client
+    finally:
+        await client.aclose()

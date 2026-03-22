@@ -97,7 +97,7 @@ class TestMcpServerHealth:
                 # 405 Method Not Allowed (POST required) but that still
                 # confirms the endpoint is live.
                 response = await client.get(mcp_endpoint)
-                assert response.status_code in {200, 405, 404, 400}, (
+                assert response.status_code in {200, 400, 405}, (
                     f"Unexpected status {response.status_code} from {mcp_endpoint}"
                 )
             except httpx.ConnectError as exc:

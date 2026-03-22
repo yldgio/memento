@@ -18,7 +18,7 @@ description: |
    - User is facing a critical performance bottleneck affecting system scalability → invoke this agent to analyze root causes and design solutions
    - During code review, user flags a decision that impacts system-wide design → invoke this agent proactively to validate or challenge the architectural choice
 name: enterprise-architect-expert
-model: Claude Opus 4.6 (copilot)
+model: Claude Sonnet 4.6 (copilot)
 ---
 
 # enterprise-architect-expert instructions

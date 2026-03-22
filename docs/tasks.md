@@ -473,6 +473,8 @@ memento/
 
 ---
 
+**Status**: Complete — verified by Batch D evidence below
+
 ### P0-T10 · Scheduler 🟢
 
 **Creates**: `memento/scheduler.py` (enhance from P0-T01 stub)
@@ -499,6 +501,23 @@ memento/
 **Tests**: `tests/unit/test_scheduler.py`
 
 - Mock clock + mock consolidation → verify sessions are picked up and processed
+
+---
+
+**Status**: Complete — verified by Batch D evidence below
+
+### Batch D Verification
+
+**Status**: Complete
+
+**Evidence**:
+
+- `python -m pytest tests/unit/test_consolidation.py tests/unit/test_scheduler.py -v` → 47 passed
+- `python -m pytest tests/unit/ -q` → 325 passed, 0 skipped, 2 warnings
+- `python -m ruff check memento tests` → passed
+- `python -m mypy memento --no-incremental` → Success: no issues found in 15 source files
+- Triple adversarial review (GPT-5.3-Codex + Gemini 3 Pro + Claude Sonnet 4.6) for 🔴 P0-T09: Found and fixed 4 issues — (1) Unicode/null-byte injection bypass via zero-width chars: added `_sanitize_text()` normalisation before regex checks; (2) `float(None)` and NaN crash in LLM confidence parsing: guarded with try/except and `math.isfinite`; (3) Injection filter missing on session metadata (task_description/project_id/agent_id): added `_check_session_metadata()` check; (4) Missing graphiti store cleanup in scheduler: added conditional `close()` call.
+- Single adversarial review for 🟢 P0-T10: Found and fixed 1 issue — missing graphiti store cleanup in `finally` block (now uses `hasattr(graphiti, "close")` pattern matching `main.py` and `mcp/server.py`). No other issues found.
 
 ---
 

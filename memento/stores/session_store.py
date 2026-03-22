@@ -308,6 +308,39 @@ class SessionStore:
         assert result is not None  # just ended it, can't be missing
         return result
 
+    async def mark_consolidated(self, session_id: str) -> SessionLog:
+        """Transition an ENDED session to CONSOLIDATED.
+
+        Raises
+        ------
+        SessionNotFoundError
+            If *session_id* does not exist.
+        SessionNotActiveError
+            If the session is not currently ENDED (we re-use the exception
+            to signal an unexpected status).
+
+        Returns
+        -------
+        SessionLog
+            The updated session with status ``CONSOLIDATED``.
+        """
+        conn = self._require_conn()
+        async with self._write_lock:
+            await conn.execute("BEGIN IMMEDIATE")
+            try:
+                await self._assert_ended(conn, session_id)
+                await conn.execute(
+                    "UPDATE sessions SET status = ? WHERE session_id = ?",
+                    (str(SessionStatus.CONSOLIDATED), session_id),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
+        result = await self.get_session(session_id)
+        assert result is not None  # just updated it, can't be missing
+        return result
+
     async def get_session(self, session_id: str) -> SessionLog | None:
         """Return the :class:`SessionLog` for *session_id*, or *None* if absent."""
         conn = self._require_conn()
@@ -484,6 +517,21 @@ class SessionStore:
         if row["status"] != str(SessionStatus.ACTIVE):
             raise SessionNotActiveError(
                 f"Session {session_id!r} has status {row['status']!r}, expected ACTIVE"
+            )
+
+    @staticmethod
+    async def _assert_ended(conn: aiosqlite.Connection, session_id: str) -> None:
+        async with conn.execute(
+            "SELECT status FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            raise SessionNotFoundError(session_id)
+        if row["status"] != str(SessionStatus.ENDED):
+            raise SessionNotActiveError(
+                f"Session {session_id!r} has status {row['status']!r},"
+                " expected ENDED"
             )
 
     @staticmethod
